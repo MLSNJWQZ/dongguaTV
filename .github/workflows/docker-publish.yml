@@ -1,17 +1,27 @@
-name: Docker Build & Publish (Multi-Arch)
+name: Docker Build & Publish
+
+# 改动说明（相对上游）：
+#  1. 加了 workflow_dispatch：可以在 Actions 页面手动点「Run workflow」构建
+#  2. 默认只构建 linux/amd64（你的 NAS 是 x86_64），十几分钟出镜像；要全架构选 multi
+#  3. 只推 ghcr.io（去掉 Docker Hub：那是上游 ednovas 的仓库，你推不上去，登录也会失败）
 
 on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: '构建架构'
+        required: true
+        default: 'amd64'
+        type: choice
+        options:
+          - amd64
+          - multi
   push:
-    # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ "main" ]
 
 env:
-  GHCR_REGISTRY: ghcr.io
-  DOCKERHUB_IMAGE: ednovas/dongguatv
-  # ghcr.io requires lowercase image names
-  GHCR_IMAGE: ${{ github.repository_owner }}/dongguatv
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/dongguatv
 
 jobs:
   build:
@@ -21,61 +31,50 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 设置 QEMU 用于多架构模拟构建
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+      - name: 检查 db.json（存在就会打进镜像）
+        run: |
+          if [ -f db.json ]; then
+            python3 -c "import json;d=json.load(open('db.json'));print('已内置 db.json，源数量:', len(d.get('sites') or []))"
+          else
+            echo "仓库里没有 db.json，镜像将使用 db.template.json 占位（运行时靠 REMOTE_DB_URL 提供源）"
+          fi
 
-      # 设置 Docker Buildx
+      - name: Set up QEMU
+        if: github.event.inputs.platforms == 'multi'
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 登录 GitHub Container Registry
       - name: Log into GHCR
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.GHCR_REGISTRY }}
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
-
-      # 登录 Docker Hub
-      - name: Log into Docker Hub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE }}
-            docker.io/${{ env.DOCKERHUB_IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
-            type=semver,pattern={{version}}
+            type=sha,format=short
 
-      # 多架构构建并推送
-      - name: Build and push Docker image (Multi-Arch)
-        id: build-and-push
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          # 支持的架构: AMD64 (x86_64), ARM64 (Apple M1/M2, 树莓派4), ARMv7 (树莓派3, 旧版ARM设备)
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: ${{ github.event_name != 'pull_request' }}
+          platforms: ${{ github.event.inputs.platforms == 'multi' && 'linux/amd64,linux/arm64,linux/arm/v7' || 'linux/amd64' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 禁用 provenance 并使用 Docker manifest v2 格式 (兼容旧版 Docker)
           provenance: false
           sbom: false
           outputs: type=image,oci-mediatypes=false

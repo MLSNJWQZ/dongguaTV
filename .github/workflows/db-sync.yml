@@ -1,0 +1,54 @@
+name: Sync db.json (from db-sync)
+
+# 每天从 db-sync 仓库拉取实测好的源列表，提交进本仓库。
+# 这样：① 本仓库自带最新源；② 构建镜像时 Dockerfile 的 COPY . . 会把 db.json 打进镜像。
+# 注意：db.json 在 .gitignore 里，所以提交时用 git add -f。
+
+on:
+  schedule:
+    # 北京 12:00，比 db-sync 的 11:00 晚 1 小时，给 jsDelivr 缓存留时间
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 拉取最新源列表（三个 CDN 依次兜底）
+        run: |
+          set -e
+          ok=0
+          for base in gcore.jsdelivr.net fastly.jsdelivr.net cdn.jsdelivr.net; do
+            echo "尝试 $base ..."
+            if curl -fsSL --retry 3 --max-time 30 -o db.json.new \
+              "https://$base/gh/MLSNJWQZ/db-sync@main/db.json"; then
+              ok=1
+              echo "下载成功：$base"
+              break
+            fi
+          done
+          if [ "$ok" != "1" ]; then
+            echo "三个 CDN 全部失败，保留原 db.json 不动"
+            exit 0
+          fi
+          python3 -c "import json,sys; d=json.load(open('db.json.new')); n=len(d.get('sites') or []); print('源数量:', n); sys.exit(0 if n >= 10 else 1)" \
+            || { echo "内容异常（源太少或不是合法 JSON），放弃本次更新"; exit 0; }
+          mv db.json.new db.json
+
+      - name: 有变化才提交
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f db.json
+          if git diff --cached --quiet; then
+            echo "db.json 无变化，不提交"
+            exit 0
+          fi
+          git commit -m "chore: 同步 db.json $(date -u +%F)"
+          git push
