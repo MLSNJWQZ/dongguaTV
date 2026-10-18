@@ -18,6 +18,10 @@ on:
         description: 'Version Tag (e.g. v1.0.0)'
         required: true
         default: 'v1.0.0'
+      app_id:
+        description: 'App ID 包名（留空=默认 com.ednovas.donguatv；要和另一个版本共存必须唯一，如 com.ednovas.donguatv.remote）'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -68,10 +72,10 @@ jobs:
         run: |
           echo "📝 Applying manual configuration..."
           
-          # 1. 修改 capacitor.config.json (server URL + appName)
+          # 1. 修改 capacitor.config.json (server URL + appName + appId)
           tmp=$(mktemp)
-          jq --arg url "${{ inputs.server_url }}" --arg name "${{ inputs.app_name }}" \
-             '.server.url = $url | .appName = $name' capacitor.config.json > "$tmp" && mv "$tmp" capacitor.config.json
+          jq --arg url "${{ inputs.server_url }}" --arg name "${{ inputs.app_name }}" --arg appid "${{ inputs.app_id }}" \
+             '.server.url = $url | .appName = $name | (if $appid != "" then .appId = $appid else . end)' capacitor.config.json > "$tmp" && mv "$tmp" capacitor.config.json
           
           # 2. 修改 Android 原生文件 (capacitor sync 不会传播这些字段)
           STRINGS_FILE="android/app/src/main/res/values/strings.xml"
@@ -92,9 +96,16 @@ jobs:
           
           sed -i "s|versionCode [0-9]*|versionCode $VERSION_CODE|" "$GRADLE_FILE"
           sed -i "s|versionName \".*\"|versionName \"$VERSION_NAME\"|" "$GRADLE_FILE"
-          
+
+          # 2c. 可选：换包名（applicationId 与 namespace 不同是允许的，namespace 保持原样）
+          APP_ID="${{ inputs.app_id }}"
+          if [ -n "$APP_ID" ]; then
+            sed -i "s|applicationId \".*\"|applicationId \"$APP_ID\"|" "$GRADLE_FILE"
+          fi
+
           echo "✅ Configuration updated:"
           echo "   App Name: ${APP_NAME}"
+          echo "   App ID: ${APP_ID:-com.ednovas.donguatv (default)}"
           echo "   Server URL: ${{ inputs.server_url }}"
           echo "   Version: ${VERSION_NAME} (code: ${VERSION_CODE})"
           echo ""
