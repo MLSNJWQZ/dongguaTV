@@ -1,0 +1,84 @@
+name: 上游更新提醒
+
+# 每天检查上游 EdNovas/dongguaTV 有没有新提交。
+# 有更新 → 开一个 Issue 提醒（已存在则原地更新内容，不会重复刷屏）
+# 没更新 → 自动关掉这个 Issue
+# 注意：只提醒，不自动 merge（本 fork 定制较多，自动合并容易冲突）
+
+on:
+  schedule:
+    # 北京 09:00
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 比对上游 main
+        run: |
+          set -e
+          git remote add upstream https://github.com/EdNovas/dongguaTV.git 2>/dev/null || true
+          git fetch --depth=80 upstream main
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          AHEAD=$(git rev-list --count upstream/main..HEAD)
+          echo "落后上游 $BEHIND 个提交，领先 $AHEAD 个提交"
+          echo "BEHIND=$BEHIND" >> "$GITHUB_ENV"
+          echo "AHEAD=$AHEAD" >> "$GITHUB_ENV"
+          git log --pretty=format:'- %h %s' HEAD..upstream/main | head -15 > upstream_commits.txt || true
+
+      - name: 有更新 → 开/更新 Issue
+        if: env.BEHIND != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "上游 [EdNovas/dongguaTV](https://github.com/EdNovas/dongguaTV) 有 **$BEHIND** 个新提交没合并（你的分支领先上游 $AHEAD 个提交）。"
+            echo ""
+            echo "### 处理步骤"
+            echo "1. 本页上方点 **Sync fork → Update branch**"
+            echo "2. Actions → **Docker Build & Publish** → Run workflow（选 amd64）"
+            echo "3. NAS 上执行：\`docker compose -p ETV pull && docker compose -p ETV up -d\`"
+            echo ""
+            echo "> 如果 Sync fork 报冲突，说明上游改动撞到了你的定制文件，需要在本地手动合并。"
+            echo ""
+            echo "### 上游新提交"
+            cat upstream_commits.txt
+            echo ""
+            echo "_本 Issue 由每天 09:00 的「上游更新提醒」自动维护，合并完会自动关闭。_"
+          } > issue_body.md
+          NUM=$(gh issue list --state open --search '上游 EdNovas/dongguaTV in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$NUM" ]; then
+            echo "已有提醒 Issue #$NUM，更新内容"
+            gh issue edit "$NUM" --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --body-file issue_body.md
+          else
+            gh issue create \
+              --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
+              --body-file issue_body.md \
+              --label "upstream" \
+            || gh issue create \
+              --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
+              --body-file issue_body.md
+          fi
+
+      - name: 无更新 → 关掉已有提醒
+        if: env.BEHIND == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM=$(gh issue list --state open --search '上游 dongguaTV in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$NUM" ]; then
+            echo "已与上游一致，关闭 Issue #$NUM"
+            gh issue close "$NUM" --comment "上游的提交已全部合并，本提醒自动关闭。"
+          else
+            echo "已与上游一致，无需提醒"
+          fi
