@@ -56,16 +56,12 @@ jobs:
             echo ""
             echo "_本 Issue 由每天 09:00 的「上游更新提醒」自动维护，合并完会自动关闭。_"
           } > issue_body.md
-          NUM=$(gh issue list --state open --search '上游 EdNovas/dongguaTV in:title' --json number --jq '.[0].number // empty')
+          NUM=$(gh issue list --state open --search '上游 dongguaTV in:title' --limit 1 --json number --jq '.[0].number // empty')
           if [ -n "$NUM" ]; then
             echo "已有提醒 Issue #$NUM，更新内容"
             gh issue edit "$NUM" --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --body-file issue_body.md
           else
             gh issue create \
-              --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
-              --body-file issue_body.md \
-              --label "upstream" \
-            || gh issue create \
               --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
               --body-file issue_body.md
           fi
