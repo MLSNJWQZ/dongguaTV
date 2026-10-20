@@ -9,7 +9,7 @@ on:
       server_url:
         description: 'Server URL (e.g. https://your-site.com)'
         required: true
-        default: 'https://ednovas.video'
+        default: 'http://192.168.3.104:3000'
       app_name:
         description: 'App Name'
         required: true
@@ -17,7 +17,7 @@ on:
       version_tag:
         description: 'Version Tag (e.g. v1.0.0)'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.1.0'
       app_id:
         description: 'App ID 包名（留空=默认 com.ednovas.donguatv；要和另一个版本共存必须唯一，如 com.ednovas.donguatv.remote）'
         required: false
@@ -301,7 +301,7 @@ jobs:
             - 📺 电视/盒子: 推荐使用电视浏览器访问网页版，兼容性更佳
             
             ### 🌐 内置服务器
-            - 默认连接: `${{ github.event.inputs.server_url || 'https://ednovas.video' }}`
+            - 默认连接: `${{ github.event.inputs.server_url || 'http://192.168.3.104:3000' }}`
             
             ---
             
