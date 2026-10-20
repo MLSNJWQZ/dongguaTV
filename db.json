@@ -36,23 +36,23 @@
       "key": "s15"
     },
     {
+      "name": "尤酷",
+      "api": "https://api.ukuapi.com/api.php/provide/vod/?ac=list",
+      "key": "s16"
+    },
+    {
       "name": "建安",
       "api": "http://154.219.117.232:9981/jacloudapi.php/provide/vod",
-      "key": "s16"
+      "key": "s17"
     },
     {
       "name": "新浪资源",
       "api": "http://api.xinlangapi.com/xinlangapi.php/provide/vod",
-      "key": "s17"
+      "key": "s18"
     },
     {
       "name": "无尽CC",
       "api": "https://api.wujinapi.cc/api.php/provide/vod",
-      "key": "s18"
-    },
-    {
-      "name": "无尽ME",
-      "api": "https://api.wujinapi.me/api.php/provide/vod",
       "key": "s19"
     },
     {
@@ -61,53 +61,53 @@
       "key": "s2"
     },
     {
+      "name": "无尽ME",
+      "api": "https://api.wujinapi.me/api.php/provide/vod",
+      "key": "s20"
+    },
+    {
       "name": "无尽NET",
       "api": "https://api.wujinapi.net/api.php/provide/vod",
-      "key": "s20"
+      "key": "s21"
     },
     {
       "name": "无尽资源",
       "api": "https://api.wujinapi.com/api.php/provide/vod",
-      "key": "s21"
+      "key": "s22"
     },
     {
       "name": "暴风资源",
       "api": "https://bfzyapi.com/api.php/provide/vod",
-      "key": "s22"
+      "key": "s23"
     },
     {
       "name": "最大点播",
       "api": "http://zuidazy.me/api.php/provide/vod",
-      "key": "s23"
+      "key": "s24"
     },
     {
       "name": "最大资源",
       "api": "https://api.zuidapi.com/api.php/provide/vod",
-      "key": "s24"
+      "key": "s25"
     },
     {
       "name": "极速资源",
       "api": "https://jszyapi.com/api.php/provide/vod",
-      "key": "s25"
+      "key": "s26"
     },
     {
       "name": "森林",
       "api": "https://slapibf.com/api.php/provide/vod/?ac=list",
-      "key": "s26"
+      "key": "s27"
     },
     {
       "name": "樱花资源",
       "api": "https://m3u8.apiyhzy.com/api.php/provide/vod",
-      "key": "s27"
+      "key": "s28"
     },
     {
       "name": "步步高资源",
       "api": "https://api.yparse.com/api/json",
-      "key": "s28"
-    },
-    {
-      "name": "海豚资源",
-      "api": "https://hhzyapi.com/api.php/provide/vod",
       "key": "s29"
     },
     {
@@ -116,53 +116,53 @@
       "key": "s3"
     },
     {
+      "name": "海豚资源",
+      "api": "https://hhzyapi.com/api.php/provide/vod",
+      "key": "s30"
+    },
+    {
       "name": "滴滴资源",
       "api": "https://api.ddapi.cc/api.php/provide/vod/?ac=list",
-      "key": "s30"
+      "key": "s31"
     },
     {
       "name": "牛牛点播",
       "api": "https://api.niuniuzy.me/api.php/provide/vod",
-      "key": "s31"
+      "key": "s32"
     },
     {
       "name": "猫眼资源",
       "api": "https://api.maoyanapi.top/api.php/provide/vod",
-      "key": "s32"
+      "key": "s33"
     },
     {
       "name": "玉兔",
       "api": "https://apiyutu.com/api.php/provide/vod/?ac=list",
-      "key": "s33"
+      "key": "s34"
     },
     {
       "name": "玉兔资源",
       "api": "https://yutuzy3.com/api.php/provide/vod/?ac=list",
-      "key": "s34"
+      "key": "s35"
     },
     {
       "name": "电影天堂",
       "api": "http://caiji.dyttzyapi.com/api.php/provide/vod",
-      "key": "s35"
+      "key": "s36"
     },
     {
       "name": "索尼资源",
       "api": "https://suoniapi.com/api.php/provide/vod",
-      "key": "s36"
+      "key": "s37"
     },
     {
       "name": "索尼闪电",
       "api": "https://xsd.sdzyapi.com/api.php/provide/vod",
-      "key": "s37"
+      "key": "s38"
     },
     {
       "name": "红牛资源",
       "api": "https://www.hongniuzy2.com/api.php/provide/vod",
-      "key": "s38"
-    },
-    {
-      "name": "红牛资源3",
-      "api": "https://www.hongniuzy3.com/api.php/provide/vod",
       "key": "s39"
     },
     {
@@ -171,8 +171,8 @@
       "key": "s4"
     },
     {
-      "name": "纯净采集",
-      "api": "https://api.wsyzy.net/api.php/provide/vod/?ac=list",
+      "name": "红牛资源3",
+      "api": "https://www.hongniuzy3.com/api.php/provide/vod",
       "key": "s40"
     },
     {
@@ -201,8 +201,8 @@
       "key": "s45"
     },
     {
-      "name": "蜜源",
-      "api": "https://iqiyizyapi.com/api.php/provide/vod",
+      "name": "裤佬丨采集",
+      "api": "https://api.wsyzy.net/api.php/provide/vod",
       "key": "s46"
     },
     {
@@ -291,8 +291,8 @@
       "key": "s61"
     },
     {
-      "name": "鸡坤资源",
-      "api": "https://jkunzyapi.com/api.php/provide/vod",
+      "name": "鸡坤",
+      "api": "https://jkunzyapi.com/api.php/provide/vod/at/json",
       "key": "s62"
     },
     {
