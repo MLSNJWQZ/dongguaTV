@@ -44,12 +44,11 @@ jobs:
           {
             echo "上游 [EdNovas/dongguaTV](https://github.com/EdNovas/dongguaTV) 有 **$BEHIND** 个新提交没合并（你的分支领先上游 $AHEAD 个提交）。"
             echo ""
-            echo "### 处理步骤"
-            echo "1. 本页上方点 **Sync fork → Update branch**"
-            echo "2. Actions → **Docker Build & Publish** → Run workflow（选 amd64）"
-            echo "3. NAS 上执行：\`docker compose -p ETV pull && docker compose -p ETV up -d\`"
+            echo "### 处理步骤（你现在跑的是作者镜像，只需第 1 步）"
+            echo "1. NAS 上拉新镜像：\`cd /vol1/1000/docker/ETV && docker compose pull && docker compose up -d\`"
+            echo "2. 如果作者还没发布新镜像（刚提交、还没构建），等几小时再 pull"
             echo ""
-            echo "> 如果 Sync fork 报冲突，说明上游改动撞到了你的定制文件，需要在本地手动合并。"
+            echo "> 仅当你以后切换到自建镜像 \`ghcr.io/mlsnjwqz/dongguatv\` 时，才需要：Sync fork → Update branch → Actions 手动 Run「Docker Build & Publish」→ NAS pull。"
             echo ""
             echo "### 上游新提交"
             cat upstream_commits.txt
