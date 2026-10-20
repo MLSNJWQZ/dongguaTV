@@ -61,9 +61,13 @@ jobs:
             echo "已有提醒 Issue #$NUM，更新内容"
             gh issue edit "$NUM" --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --body-file issue_body.md
           else
-            gh issue create \
-              --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
-              --body-file issue_body.md
+            HTTP=$(curl -s -o resp.json -w "%{http_code}" -X POST \
+              -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues" \
+              -d "$(jq -n --arg t "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --rawfile b issue_body.md '{title:$t, body:$b}')")
+            echo "create issue http=$HTTP"
+            cat resp.json
+            [ "$HTTP" = "201" ]
           fi
 
       - name: 无更新 → 关掉已有提醒
