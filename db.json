@@ -36,18 +36,18 @@
       "key": "s15"
     },
     {
-      "name": "奥斯卡",
-      "api": "https://aosikazy.com/api.php/provide/vod/?ac=list",
-      "key": "s16"
-    },
-    {
       "name": "奶香",
       "api": "https://Naixxzy.com/api.php/provide/vod/?ac=list",
-      "key": "s17"
+      "key": "s16"
     },
     {
       "name": "如意资源",
       "api": "https://cj.rycjapi.com/api.php/provide/vod",
+      "key": "s17"
+    },
+    {
+      "name": "快车",
+      "api": "https://caiji.kuaichezy.org/api.php/provide/vod/?ac=list",
       "key": "s18"
     },
     {
@@ -81,33 +81,33 @@
       "key": "s23"
     },
     {
+      "name": "无水印",
+      "api": "https://api.wsyzy.net/api.php/provide/vod/?ac=list",
+      "key": "s24"
+    },
+    {
       "name": "暴风资源",
       "api": "https://bfzyapi.com/api.php/provide/vod",
-      "key": "s24"
+      "key": "s25"
     },
     {
       "name": "最大点播",
       "api": "http://zuidazy.me/api.php/provide/vod",
-      "key": "s25"
+      "key": "s26"
     },
     {
       "name": "最大资源",
       "api": "https://api.zuidapi.com/api.php/provide/vod",
-      "key": "s26"
+      "key": "s27"
     },
     {
       "name": "极速资源",
       "api": "https://jszyapi.com/api.php/provide/vod",
-      "key": "s27"
+      "key": "s28"
     },
     {
       "name": "森林",
       "api": "https://slapibf.com/api.php/provide/vod/?ac=list",
-      "key": "s28"
-    },
-    {
-      "name": "樱花资源",
-      "api": "https://m3u8.apiyhzy.com/api.php/provide/vod",
       "key": "s29"
     },
     {
@@ -116,53 +116,53 @@
       "key": "s3"
     },
     {
+      "name": "樱花资源",
+      "api": "https://m3u8.apiyhzy.com/api.php/provide/vod",
+      "key": "s30"
+    },
+    {
       "name": "步步高资源",
       "api": "https://api.yparse.com/api/json",
-      "key": "s30"
+      "key": "s31"
     },
     {
       "name": "海豚资源",
       "api": "https://hhzyapi.com/api.php/provide/vod",
-      "key": "s31"
+      "key": "s32"
     },
     {
       "name": "滴滴资源",
       "api": "https://api.ddapi.cc/api.php/provide/vod/?ac=list",
-      "key": "s32"
+      "key": "s33"
     },
     {
       "name": "牛牛点播",
       "api": "https://api.niuniuzy.me/api.php/provide/vod",
-      "key": "s33"
+      "key": "s34"
     },
     {
       "name": "猫眼资源",
       "api": "https://api.maoyanapi.top/api.php/provide/vod",
-      "key": "s34"
+      "key": "s35"
     },
     {
       "name": "玉兔",
       "api": "https://apiyutu.com/api.php/provide/vod/?ac=list",
-      "key": "s35"
+      "key": "s36"
     },
     {
       "name": "玉兔资源",
       "api": "https://yutuzy3.com/api.php/provide/vod/?ac=list",
-      "key": "s36"
+      "key": "s37"
     },
     {
       "name": "电影天堂",
       "api": "http://caiji.dyttzyapi.com/api.php/provide/vod",
-      "key": "s37"
+      "key": "s38"
     },
     {
       "name": "索尼资源",
       "api": "https://suoniapi.com/api.php/provide/vod",
-      "key": "s38"
-    },
-    {
-      "name": "索尼闪电",
-      "api": "https://xsd.sdzyapi.com/api.php/provide/vod",
       "key": "s39"
     },
     {
@@ -171,48 +171,48 @@
       "key": "s4"
     },
     {
+      "name": "索尼闪电",
+      "api": "https://xsd.sdzyapi.com/api.php/provide/vod",
+      "key": "s40"
+    },
+    {
       "name": "红牛资源",
       "api": "https://www.hongniuzy2.com/api.php/provide/vod",
-      "key": "s40"
+      "key": "s41"
     },
     {
       "name": "红牛资源3",
       "api": "https://www.hongniuzy3.com/api.php/provide/vod",
-      "key": "s41"
+      "key": "s42"
     },
     {
       "name": "老色逼资源站",
       "api": "https://apilsbzy1.com/api.php/provide/vod/?ac=list",
-      "key": "s42"
+      "key": "s43"
     },
     {
       "name": "色猫",
       "api": "https://caiji.semaozy.net/inc/apijson_vod.php",
-      "key": "s43"
+      "key": "s44"
     },
     {
       "name": "茅台",
       "api": "https://mtzy.me/api.php/provide/vod",
-      "key": "s44"
+      "key": "s45"
     },
     {
       "name": "茅台资源",
       "api": "https://caiji.maotaizy.cc/api.php/provide/vod",
-      "key": "s45"
+      "key": "s46"
     },
     {
       "name": "虎牙资源",
       "api": "https://www.huyaapi.com/api.php/provide/vod",
-      "key": "s46"
+      "key": "s47"
     },
     {
       "name": "蜜源",
       "api": "https://iqiyizyapi.com/api.php/provide/vod",
-      "key": "s47"
-    },
-    {
-      "name": "裤佬丨采集",
-      "api": "https://api.wsyzy.net/api.php/provide/vod",
       "key": "s48"
     },
     {
@@ -241,38 +241,38 @@
       "key": "s52"
     },
     {
+      "name": "速播",
+      "api": "https://subocj.com/api.php/provide/vod/from/subyun/at/json",
+      "key": "s53"
+    },
+    {
       "name": "量子资源",
       "api": "https://lzizy1.com/api.php/provide/vod",
-      "key": "s53"
+      "key": "s54"
     },
     {
       "name": "金鹰点播",
       "api": "https://jinyingzy.com/api.php/provide/vod",
-      "key": "s54"
+      "key": "s55"
     },
     {
       "name": "閃電资源",
       "api": "https://sdzyapi.com/api.php/provide/vod",
-      "key": "s55"
+      "key": "s56"
     },
     {
       "name": "非凡API",
       "api": "https://api.ffzyapi.com/api.php/provide/vod",
-      "key": "s56"
+      "key": "s57"
     },
     {
       "name": "非凡线路1",
       "api": "http://ffzy1.tv/api.php/provide/vod",
-      "key": "s57"
+      "key": "s58"
     },
     {
       "name": "非凡资源",
       "api": "http://ffzy5.tv/api.php/provide/vod",
-      "key": "s58"
-    },
-    {
-      "name": "非凡采集",
-      "api": "http://cj.ffzyapi.com/api.php/provide/vod",
       "key": "s59"
     },
     {
@@ -281,24 +281,29 @@
       "key": "s6"
     },
     {
+      "name": "非凡采集",
+      "api": "http://cj.ffzyapi.com/api.php/provide/vod",
+      "key": "s60"
+    },
+    {
       "name": "魔都动漫",
       "api": "https://caiji.moduapi.cc/api.php/provide/vod",
-      "key": "s60"
+      "key": "s61"
     },
     {
       "name": "魔都资源",
       "api": "https://www.mdzyapi.com/api.php/provide/vod",
-      "key": "s61"
+      "key": "s62"
     },
     {
       "name": "鲸鱼资源",
       "api": "https://jyzyapi.com/provide/vod",
-      "key": "s62"
+      "key": "s63"
     },
     {
       "name": "鸡坤资源",
       "api": "https://jkunzyapi.com/api.php/provide/vod",
-      "key": "s63"
+      "key": "s64"
     },
     {
       "name": "•建安",
