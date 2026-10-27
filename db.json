@@ -6,28 +6,28 @@
       "key": "s1"
     },
     {
-      "name": "优质",
-      "api": "https://api.yyzy-tv.vip/inc/apijson.php",
-      "key": "s10"
-    },
-    {
       "name": "优质资源",
       "api": "https://api.1080zyku.com/inc/api_mac10.php?ac=list",
-      "key": "s11"
+      "key": "s10"
     },
     {
       "name": "光速资源",
       "api": "https://api.guangsuapi.com/api.php/provide/vod",
-      "key": "s12"
+      "key": "s11"
     },
     {
       "name": "天涯海角",
       "api": "https://tyyszyapi.com/api.php/provide/vod",
-      "key": "s13"
+      "key": "s12"
     },
     {
       "name": "天涯资源",
       "api": "https://tyyszy.com/api.php/provide/vod",
+      "key": "s13"
+    },
+    {
+      "name": "奥斯卡",
+      "api": "https://aosikazy.com/api.php/provide/vod/?ac=list",
       "key": "s14"
     },
     {
@@ -306,18 +306,18 @@
       "key": "s64"
     },
     {
-      "name": "•非凡",
-      "api": "http://ffzy.tv/api.php/provide/vod",
-      "key": "s7"
-    },
-    {
       "name": "丫丫点播",
       "api": "https://cj.yayazy.net/api.php/provide/vod",
-      "key": "s8"
+      "key": "s7"
     },
     {
       "name": "乐子资源",
       "api": "https://cj.lziapi.com/api.php/provide/vod",
+      "key": "s8"
+    },
+    {
+      "name": "优质",
+      "api": "https://api.yyzy-tv.vip/inc/apijson.php",
       "key": "s9"
     }
   ]
