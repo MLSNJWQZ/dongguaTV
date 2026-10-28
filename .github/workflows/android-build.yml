@@ -275,37 +275,44 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
 
+      # 生成发布说明：RELEASE_NOTES.md（本次更新内容）+ 固定的下载/兼容性说明
+      # 每次发版只需改仓库根目录的 RELEASE_NOTES.md，下载页自动显示
+      - name: Prepare release notes
+        run: |
+          {
+            if [ -f RELEASE_NOTES.md ]; then
+              cat RELEASE_NOTES.md
+            else
+              echo "## 更新说明"
+              echo ""
+              echo "- 本次为常规构建，未填写更新说明。"
+            fi
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 支持的 CPU 架构"
+            echo "- armeabi-v7a (ARM 32位 - 旧手机/盒子)"
+            echo "- arm64-v8a (ARM 64位 - 大多数现代手机/盒子/电视)"
+            echo "- x86 / x86_64 (Intel/AMD - 模拟器/部分平板)"
+            echo ""
+            echo "### 设备兼容性"
+            echo "- 手机 (Android 5.0+) / 平板"
+            echo "- 电视/盒子：自动全屏横屏 + 遥控器方向键导航"
+            echo ""
+            echo "### 内置服务器"
+            echo "- 默认连接: \"\${{ github.event.inputs.server_url || 'http://192.168.3.104:3000' }}\""
+            echo "- 服务失联时会自动扫描局域网找回（任意 IP，端口不变）"
+            echo ""
+            echo "> 首次安装可能需要允许\"安装未知来源应用\""
+          } > release-notes.md
+          cat release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
           name: "E视界 ${{ steps.version.outputs.VERSION }}"
-          body: |
-            ## 📦 E视界 ${{ steps.version.outputs.VERSION }}
-            
-            ### 📱 Android APK 下载
-            
-            | 文件 | 说明 |
-            |------|------|
-            | `E视界-${{ steps.version.outputs.VERSION }}-universal.apk` | 通用版 (支持所有设备) |
-            
-            ### 🖥️ 支持的 CPU 架构
-            - ✅ `armeabi-v7a` (ARM 32位 - 旧手机/盒子)
-            - ✅ `arm64-v8a` (ARM 64位 - 大多数现代手机/盒子)
-            - ✅ `x86` (Intel/AMD 32位 - 模拟器)
-            - ✅ `x86_64` (Intel/AMD 64位 - 模拟器/部分平板)
-            
-            ### 📺 设备兼容性
-            - ✅ 手机 (Android 5.0+)
-            - ✅ 平板
-            - 📺 电视/盒子: 推荐使用电视浏览器访问网页版，兼容性更佳
-            
-            ### 🌐 内置服务器
-            - 默认连接: `${{ github.event.inputs.server_url || 'http://192.168.3.104:3000' }}`
-            
-            ---
-            
-            > ⚠️ 首次安装可能需要允许"安装未知来源应用"
+          body_path: release-notes.md
           files: android/app/build/outputs/apk/release/*.apk
           draft: false
           prerelease: false
