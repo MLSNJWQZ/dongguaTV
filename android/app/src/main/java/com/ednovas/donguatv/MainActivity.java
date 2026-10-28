@@ -19,7 +19,20 @@ import com.getcapacitor.BridgeActivity;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.Socket;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
 
@@ -32,6 +45,13 @@ public class MainActivity extends BridgeActivity {
     private boolean isTv = false;
     private String tvRuntimeJs = null;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
+
+    // 🌐 服务自动发现：内置地址失联时，自动扫描局域网找回同服务（任意 IP，端口沿用内置配置）
+    private static final String FALLBACK_BASE_URL = "http://192.168.3.104:3000";
+    private static final int FIND_MAX_RETRIES = 6;
+    private static final long FIND_RETRY_DELAY_MS = 15000;
+    private volatile boolean serverFound = false;
+    private int findAttempts = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -63,6 +83,9 @@ public class MainActivity extends BridgeActivity {
 
         // 预读 TV 导航运行时脚本（assets/tv_nav.js）
         tvRuntimeJs = readAsset("tv_nav.js");
+
+        // 🌐 启动服务探测（只调度一次；onStart 会多次走，不能放那里）
+        scheduleServerCheck(4000);
     }
 
     @Override
@@ -101,6 +124,146 @@ public class MainActivity extends BridgeActivity {
         // 📺 TV 模式：全程沉浸（隐藏状态栏/导航栏），不再交给网页逐个申请
         if (isTv) {
             enterFullscreen();
+        }
+    }
+
+    /* ---------------- 🌐 服务自动发现 ---------------- */
+
+    // 读构建时烧进 APK 的首选地址（capacitor.config.json 由 npx cap sync 拷进 assets）
+    private String configuredBaseUrl() {
+        try (InputStream is = getAssets().open("capacitor.config.json")) {
+            StringBuilder sb = new StringBuilder();
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            JSONObject obj = new JSONObject(sb.toString());
+            JSONObject server = obj.optJSONObject("server");
+            String url = server != null ? server.optString("url", "") : "";
+            return url.startsWith("http") ? url : FALLBACK_BASE_URL;
+        } catch (Exception e) {
+            return FALLBACK_BASE_URL;
+        }
+    }
+
+    private void scheduleServerCheck(long delayMs) {
+        uiHandler.postDelayed(this::checkServerReachability, delayMs);
+    }
+
+    private void checkServerReachability() {
+        if (serverFound) return;
+        final String base = configuredBaseUrl();
+        findAttempts++;
+        new Thread(() -> {
+            if (hostReachable(base)) {
+                serverFound = true; // 内置地址正常，什么都不用做
+                return;
+            }
+            String found = scanLanForServer(base);
+            if (found != null && !serverFound) {
+                serverFound = true;
+                final String target = found;
+                runOnUiThread(() -> {
+                    WebView wv = getBridge() != null ? getBridge().getWebView() : null;
+                    if (wv != null) {
+                        wv.evaluateJavascript("location.replace('" + target + "/')", null);
+                    }
+                });
+            } else if (findAttempts < FIND_MAX_RETRIES) {
+                // 没找到（可能 NAS 正在重启）：每 15 秒再试
+                scheduleServerCheck(FIND_RETRY_DELAY_MS);
+            }
+        }, "server-find").start();
+    }
+
+    // 首选地址的 host:port 是否可连
+    private boolean hostReachable(String baseUrl) {
+        try {
+            URL u = new URL(baseUrl);
+            int port = u.getPort() > 0 ? u.getPort() : 80;
+            return portOpen(u.getHost(), port, 1500);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // 扫描所有本机所在 IPv4 内网网段，找端口上应答 /api/config 200 的设备
+    private String scanLanForServer(String baseUrl) {
+        int port = 3000;
+        try {
+            URL u = new URL(baseUrl);
+            if (u.getPort() > 0) port = u.getPort();
+        } catch (Exception ignored) {}
+
+        List<String> prefixes = new ArrayList<>();
+        try {
+            Enumeration<NetworkInterface> nis = NetworkInterface.getNetworkInterfaces();
+            while (nis.hasMoreElements()) {
+                NetworkInterface ni = nis.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                Enumeration<InetAddress> addrs = ni.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    InetAddress a = addrs.nextElement();
+                    if (a instanceof Inet4Address && a.isSiteLocalAddress()) {
+                        byte[] ip = a.getAddress();
+                        prefixes.add((ip[0] & 0xff) + "." + (ip[1] & 0xff) + "." + (ip[2] & 0xff) + ".");
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        for (String prefix : prefixes) {
+            String hit = scanSubnet(prefix, port);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    private String scanSubnet(final String prefix, final int port) {
+        ExecutorService pool = Executors.newFixedThreadPool(48);
+        List<Future<String>> futures = new ArrayList<>();
+        try {
+            for (int i = 1; i <= 254; i++) {
+                final String host = prefix + i;
+                futures.add(pool.submit(() -> {
+                    if (!portOpen(host, port, 250)) return null;
+                    // 端口开着还要验明正身：dongguaTV 的 /api/config 必须应答 200
+                    return serverIsDonggua(host, port) ? "http://" + host + ":" + port : null;
+                }));
+            }
+            for (Future<String> f : futures) {
+                String r = f.get();
+                if (r != null) return r;
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ignored) {
+        } finally {
+            pool.shutdownNow();
+        }
+        return null;
+    }
+
+    private boolean portOpen(String host, int port, int timeoutMs) {
+        try (Socket s = new Socket()) {
+            s.connect(new InetSocketAddress(host, port), timeoutMs);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean serverIsDonggua(String host, int port) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL("http://" + host + ":" + port + "/api/config").openConnection();
+            conn.setConnectTimeout(1500);
+            conn.setReadTimeout(1500);
+            conn.setRequestMethod("GET");
+            return conn.getResponseCode() == 200;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
     }
 
