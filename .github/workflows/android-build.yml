@@ -25,7 +25,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # 钉死 24.04：ubuntu-latest 自 2026-10-19 起分批迁移到 Ubuntu 26.04（官方标注 Breaking changes），
+    # 一是可能缺 ImageMagick 6 的 convert 命令（图标生成用它），二是 Android SDK 预装差异，
+    # 三是灰度期同标签会跑在不同系统上、问题难复现。等 26.04 稳定后再单独验一次。
+    runs-on: ubuntu-24.04
     
     steps:
       - name: Checkout repository
