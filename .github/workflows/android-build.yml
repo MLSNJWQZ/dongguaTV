@@ -307,6 +307,16 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      # 幂等重建：同版本重跑时先删掉同名 Release（否则 gh-release 会因附件重名报 already_exists）
+      - name: Clean previous release for this tag
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.VERSION }}"
+          echo "清理旧 Release: $TAG"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || echo "无旧 Release，跳过"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
