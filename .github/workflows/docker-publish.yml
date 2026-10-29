@@ -18,6 +18,8 @@ on:
           - multi
   push:
     tags: [ 'v*.*.*' ]
+  # 注：上游还加了 pull_request 触发，这里刻意不采用——PR 上也会走 push:true 推镜像，
+  # 一是 fork 的 PR 令牌只读会失败，二是会产生无意义的 sha 标签。校验构建请用本地/手动触发。
 
 env:
   REGISTRY: ghcr.io
