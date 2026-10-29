@@ -90,6 +90,10 @@ const PASSWORD_HASH = ACCESS_PASSWORDS.length > 0
     ? crypto.createHash('sha256').update(ACCESS_PASSWORDS[0]).digest('hex')
     : '';
 
+// 👤 自建账号模块句柄(在下方 REQ_DB_OK 定义之后初始化;这里先声明,好让上面的 userIdentity 等
+//    早期定义的函数也能安全引用它——let 有 TDZ,提前声明可避免"调用早于初始化"时抛 ReferenceError)
+let authUsers = null;
+
 // 生成密码到哈希的映射（用于历史同步）
 // ⚠️ 必须无原型:普通 {} 上 PASSWORD_HASH_MAP['constructor'] / ['__proto__'] / ['toString'] 都是真值,
 //    passwordHash:'constructor' 就能通过 /api/auth/verify 和各接口的 !PASSWORD_HASH_MAP[token] 校验(审查实锤)
@@ -120,6 +124,8 @@ ACCESS_PASSWORDS.forEach(pwd => { HASH_TO_PASSWORD[crypto.createHash('sha256').u
 // 求片/统计后台展示用：把 token 翻成人能认的身份
 function userIdentity(token, label) {
     if (label && String(label).trim()) return String(label).trim();
+    // 👤 自建账号:token 是随机串(不在 HASH_TO_PASSWORD 里),不查表会退化成一串哈希片段,后台认不出是谁
+    if (token && authUsers) { const _u = authUsers.labelOf(token); if (_u) return _u; }
     if (token && HASH_TO_PASSWORD[token]) return ((PASSWORD_HASH_MAP[token] && PASSWORD_HASH_MAP[token].index === 0) ? '主密码: ' : '独立密码: ') + HASH_TO_PASSWORD[token];
     if (token && String(token).startsWith('v2board_')) return 'v2board用户#' + String(token).slice(8, 16);
     return (token ? String(token).slice(0, 12) : '匿名');
@@ -1990,6 +1996,24 @@ app.post('/api/intro/env', introLimiter, (req, res) => {
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const REQ_DB_OK = () => cacheManager.type === 'sqlite' && cacheManager.db;
 
+// 👤 自建账号(可选,实现见 lib/auth-users):用户名+密码登录、站长后台建号/改密/删号、用户自助改密。
+//    需 CACHE_TYPE=sqlite —— 账号只能存 cache.db(db.json 会被 REMOTE_DB_URL 每 5 分钟整体覆盖)。
+//    最小侵入的关键:每个账号有一个与密码解耦的随机 token,启动时并入 PASSWORD_HASH_MAP(index≥1000),
+//    于是全站 20 多处既有的 PASSWORD_HASH_MAP[token]/ownToken(token) 鉴权点自动认这些账号,一个调用点都不用改。
+//    副作用:改密码不换 token → 手机/电视/电脑都不掉线;删号/改密后调 resync() 保持一致。
+try {
+    authUsers = require('./lib/auth-users').createAuthUsers({ db: () => REQ_DB_OK() ? cacheManager.db : null });
+    if (authUsers.init()) {
+        const _n = authUsers.resync(PASSWORD_HASH_MAP);
+        if (_n) console.log(`[System] 自建账号: ${_n} 个已加载(令牌并入登录校验)`);
+    }
+} catch (e) { console.warn('[账号] 模块加载失败,自建账号已禁用:', e.message); authUsers = null; }
+// 账号有增删/改密后调用:重建 PASSWORD_HASH_MAP 里 index≥1000 的那批令牌
+function accountsResync() {
+    try { if (authUsers) authUsers.resync(PASSWORD_HASH_MAP); } catch (e) { }
+    if (userStats) { try { userStats.invalidate(); } catch (e) { } }
+}
+
 // ========== 用户统计/封禁 助手 ==========
 // 记录用户活跃(last_active)、登录(last_login)、身份标签(label=email)。在历史同步/求片/登录处调用。
 function touchUser(token, opts) {
@@ -2169,6 +2193,78 @@ app.get('/api/admin/user-history', (req, res) => {
         });
         res.json({ history });
     } catch (e) { res.status(500).json({ error: 'Database error' }); }
+});
+
+// ========== 👤 自建账号：站长后台管理（ADMIN_TOKEN 鉴权，实现见 lib/auth-users）==========
+// 与老式 ACCESS_PASSWORD 并存：账号是「用户名+密码」，有独立随机 token；老密码仍是 sha256(密码) 当 token。
+// 封禁复用 user_stats.banned（全站 isBanned() 与后台用户列表都读它），所以这里除了写 app_users 还要同步那张表。
+const ACCT_ERR = { error: '自建账号未启用（需 CACHE_TYPE=sqlite）' };
+app.get('/api/admin/app-users', (req, res) => {
+    if (!adminAuthed(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (!authUsers || !authUsers.enabled()) return res.json({ ok: true, enabled: false, list: [] });
+    res.json({ ok: true, enabled: true, list: authUsers.list(), legacy: ACCESS_PASSWORDS.length });
+});
+
+app.post('/api/admin/app-users', (req, res) => {            // 建号
+    if (!adminAuthed(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (!authUsers || !authUsers.enabled()) return res.status(400).json(ACCT_ERR);
+    const { username, password, note } = req.body || {};
+    authUsers.create({ username, password, note }).then(r => {
+        if (!r.ok) return res.status(400).json({ error: r.error });
+        accountsResync();                                    // 新令牌并入登录校验，立即生效
+        res.json({ ok: true, username: r.username, token: r.token });
+    }).catch(() => res.status(500).json({ error: 'server error' }));
+});
+
+app.post('/api/admin/app-users/password', (req, res) => {   // 站长重置密码（token 不变 → 用户其他设备不掉线）
+    if (!adminAuthed(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (!authUsers || !authUsers.enabled()) return res.status(400).json(ACCT_ERR);
+    const { username, password } = req.body || {};
+    authUsers.setPassword(username, password).then(r => {
+        if (!r.ok) return res.status(400).json({ error: r.error });
+        res.json({ ok: true, username: r.username });
+    }).catch(() => res.status(500).json({ error: 'server error' }));
+});
+
+app.post('/api/admin/app-users/ban', (req, res) => {        // 封禁 / 解封
+    if (!adminAuthed(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (!authUsers || !authUsers.enabled()) return res.status(400).json(ACCT_ERR);
+    const { username, banned } = req.body || {};
+    const r = authUsers.setBanned(username, banned);
+    if (!r.ok) return res.status(400).json({ error: r.error });
+    try {
+        if (REQ_DB_OK()) {
+            const b = banned ? 1 : 0, now = Date.now();
+            const has = cacheManager.db.prepare('SELECT 1 FROM user_stats WHERE user_token = ?').get(r.token);
+            if (has) cacheManager.db.prepare('UPDATE user_stats SET banned = ?, banned_at = ? WHERE user_token = ?').run(b, b ? now : null, r.token);
+            else cacheManager.db.prepare('INSERT INTO user_stats (user_token, first_seen, banned, banned_at) VALUES (?, ?, ?, ?)').run(r.token, now, b, b ? now : null);
+        }
+    } catch (e) { }
+    accountsResync();
+    res.json({ ok: true, banned: !!banned });
+});
+
+app.post('/api/admin/app-users/remove', (req, res) => {     // 删号（其设备立刻掉线；观看历史留在库里但认不回本人）
+    if (!adminAuthed(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (!authUsers || !authUsers.enabled()) return res.status(400).json(ACCT_ERR);
+    const { username } = req.body || {};
+    const r = authUsers.remove(username);
+    if (!r.ok) return res.status(400).json({ error: r.error });
+    accountsResync();
+    res.json({ ok: true, username: r.username });
+});
+
+// 用户自助改密：只换密码哈希，token 不变（手机/电视/电脑都不用重新登录）
+const changePwdLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, keyGenerator: ipKey, message: { ok: false, error: '请求过于频繁' } });
+app.post('/api/auth/change-password', changePwdLimiter, (req, res) => {
+    if (!authUsers || !authUsers.enabled()) return res.status(400).json({ ok: false, error: '账号功能未启用' });
+    const { token, oldPassword, newPassword } = req.body || {};
+    if (!token || !authUsers.byToken(token)) return res.status(401).json({ ok: false, error: '登录状态无效' });
+    if (isBanned(token)) return res.status(403).json({ ok: false, error: 'banned' });
+    authUsers.changePassword(token, oldPassword, newPassword).then(r => {
+        if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+        res.json({ ok: true, username: r.username });        // 不需要 resync：token 没变，映射本来就在
+    }).catch(() => res.status(500).json({ ok: false, error: 'server error' }));
 });
 
 // TMDB 通用代理与缓存 API
@@ -4051,17 +4147,34 @@ try {
 // 5. 认证检查 API
 app.get('/api/auth/check', (req, res) => {
     // 检查是否需要密码
+    const _acctN = (authUsers && authUsers.enabled()) ? authUsers.count() : 0;
     res.json({
-        requirePassword: ACCESS_PASSWORDS.length > 0,
-        multiUserMode: ACCESS_PASSWORDS.length > 1,
+        requirePassword: ACCESS_PASSWORDS.length > 0 || _acctN > 0,
+        multiUserMode: ACCESS_PASSWORDS.length > 1 || _acctN > 0,
         shareTrial: SHARE_TRIAL_SEC,
-        qrLogin: !!qrLogin && ACCESS_PASSWORDS.length > 0
+        qrLogin: !!qrLogin && ACCESS_PASSWORDS.length > 0,
+        accounts: !!authUsers && authUsers.enabled()   // 前端据此外显/隐藏"用户名"输入框
     });
 });
 
 // 6. 验证密码 API（支持多密码）
 app.post('/api/auth/verify', (req, res) => {
-    const { password, passwordHash } = req.body;
+    const { password, passwordHash, username } = req.body;
+
+    // 👤 自建账号:用户名 + 密码。用户名留空则跳过,走下面老式的"只输密码"逻辑 —— 两条路互不干扰,
+    //    现有 ACCESS_PASSWORD 里的密码和已登录设备的令牌全部照旧有效。
+    if (username && password && authUsers && authUsers.enabled()) {
+        return authUsers.verify(username, password).then(r => {
+            if (!r.ok) return res.json({ success: false, banned: !!r.banned });
+            if (isBanned(r.token)) return res.json({ success: false, banned: true });
+            try {
+                touchUser(r.token, { login: true, label: r.username });   // 后台用户列表里显示成账号名
+                if (userStats) userStats.touchVisit(r.token, req);
+            } catch (e) { }
+            // passwordHash 这个字段名沿用老协议,但值是与密码解耦的随机 token —— 改密码时它不变,其他设备不掉线
+            res.json({ success: true, passwordHash: r.token, syncEnabled: true, userIndex: r.index, username: r.username });
+        }).catch(() => res.json({ success: false }));
+    }
 
     // 无密码保护时直接通过
     if (ACCESS_PASSWORDS.length === 0) {

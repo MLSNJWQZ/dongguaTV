@@ -825,6 +825,64 @@
                             <pager :page="sh.data.page || sh.page" :pages="sharePages" @go="goSharesPage"></pager>
                         </template>
                     </section>
+
+                    <!-- 👤 自建账号：与 ACCESS_PASSWORD 里的老式密码并存。账号用「用户名+密码」登录，
+                         有独立随机令牌(改密码不换令牌 → 用户其他设备不掉线)；老密码不受影响、照旧可用。 -->
+                    <section v-show="tab === 'accounts'" class="sec" aria-label="账号">
+                        <div class="toolbar">
+                            <span v-if="ac.data" class="muted count">{{ ac.data.list.length }} 个账号<span v-if="ac.data.legacy"> · 另有 {{ ac.data.legacy }} 个环境变量密码</span></span>
+                            <button type="button" class="btn btn-sm" :disabled="ac.loading" @click="loadAccounts">刷新</button>
+                        </div>
+                        <p class="since">
+                            账号存在 SQLite(cache.db)里，<b>不是</b> db.json —— 后者会被远程配置定时覆盖。删号后该用户所有设备立刻掉线；
+                            改密码与重置密码都不会（令牌独立于密码）。
+                        </p>
+
+                        <load-state :st="ac" :has="!!ac.data" label="加载账号" @retry="loadAccounts"></load-state>
+                        <template v-if="ac.data">
+                            <div v-if="!ac.data.enabled" class="empty">
+                                自建账号未启用：需要 <code>CACHE_TYPE=sqlite</code>（当前不是，账号无法存储）
+                            </div>
+                            <template v-else>
+                                <div class="panel p0 table-wrap" :class="{ dim: ac.loading }">
+                                    <table class="tbl">
+                                        <thead><tr><th>用户名</th><th>备注</th><th>最近登录</th><th>创建</th><th style="width:1%">操作</th></tr></thead>
+                                        <tbody>
+                                            <tr v-if="!ac.data.list.length"><td colspan="5" class="empty-s">还没有账号，用下面「新建账号」加第一个</td></tr>
+                                            <tr v-for="u in ac.data.list" :key="u.username">
+                                                <td>
+                                                    <strong>{{ u.username }}</strong>
+                                                    <span v-if="u.banned" class="badge b-ban" style="margin-left:6px">⛔ 已封禁</span>
+                                                    <div class="sub"><code :title="u.token">{{ shortTok(u.token, 12) }}</code></div>
+                                                </td>
+                                                <td class="wrapany">{{ u.note || '—' }}</td>
+                                                <td :title="u.last_login ? fmtAbs(u.last_login) : ''">{{ u.last_login ? fmtRel(u.last_login) : '从未登录' }}</td>
+                                                <td :title="fmtAbs(u.created_at)">{{ fmtRel(u.created_at) }}</td>
+                                                <td style="white-space:nowrap">
+                                                    <button type="button" class="btn btn-xs" :disabled="ac.busy[u.username]" @click="acReset(u)">重置密码</button>
+                                                    <button type="button" class="btn btn-xs" :class="u.banned ? 'btn-ok' : 'btn-danger-ghost'" :disabled="ac.busy[u.username]" @click="acBan(u)">{{ u.banned ? '解封' : '封禁' }}</button>
+                                                    <button type="button" class="btn btn-xs btn-danger-ghost" :disabled="ac.busy[u.username]" @click="acRemove(u)">删除</button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="panel" style="margin-top:16px">
+                                    <div class="panel-h"><h2>新建账号</h2><span class="muted">用户名 3-32 位（字母/数字/下划线/连字符），密码 6-128 位</span></div>
+                                    <div class="req-form">
+                                        <input class="req-input" v-model="ac.form.username" placeholder="用户名（如 zhangsan）" maxlength="32" autocomplete="off">
+                                        <input class="req-input" v-model="ac.form.password" type="password" placeholder="初始密码（至少 6 位）" maxlength="128" autocomplete="new-password">
+                                        <input class="req-input" v-model="ac.form.note" placeholder="备注（可选，如「张三 · 电视」）" maxlength="200">
+                                        <button class="btn btn-danger" :disabled="ac.busy.__new || !acNewOk()" @click="acCreate">{{ ac.busy.__new ? '创建中…' : '创建账号' }}</button>
+                                    </div>
+                                    <div v-if="ac.msg" style="margin-top:12px; padding:10px 12px; border-radius:8px; font-size:13px; line-height:1.6;"
+                                        :style="ac.msgOk ? { color:'#4ade80', background:'rgba(74,222,128,.1)', border:'1px solid rgba(74,222,128,.25)' }
+                                                        : { color:'#ff6b6b', background:'rgba(229,9,20,.1)', border:'1px solid rgba(229,9,20,.25)' }">{{ ac.msg }}</div>
+                                </div>
+                            </template>
+                        </template>
+                    </section>
                 </main>
             </template>
 
@@ -1001,7 +1059,7 @@
             const CH_LABEL = Object.fromEntries(CHANNELS);
             const SOURCE_PRESET = ['微信', '企业微信', 'QQ', 'QQ浏览器', '微博', '钉钉', '飞书', '抖音/TikTok', '小红书', '百度App', 'Telegram', 'Facebook', 'Instagram', 'LINE', 'X', 'Google', '百度', 'Bing', '直接打开'];
             const K = Object.freeze({
-                TABS: [{ id: 'overview', label: '概览', icon: '📊' }, { id: 'users', label: '用户', icon: '👥' }, { id: 'requests', label: '求片', icon: '📮' }, { id: 'shares', label: '分享', icon: '🔗' }],
+                TABS: [{ id: 'overview', label: '概览', icon: '📊' }, { id: 'users', label: '用户', icon: '👥' }, { id: 'requests', label: '求片', icon: '📮' }, { id: 'shares', label: '分享', icon: '🔗' }, { id: 'accounts', label: '账号', icon: '🔑' }],
                 USER_STATUS: [['all', '全部状态'], ['active1', '今日活跃'], ['active7', '7 日活跃'], ['active30', '30 日活跃'], ['dormant', '沉睡 30 天+'], ['never', '从未观看'], ['banned', '已封禁'], ['requests', '有求片'], ['shares', '有分享']],
                 USER_SORTS: [['last_active', '最近活跃'], ['last_login', '最近登录'], ['watch', '观看时长'], ['episodes', '观看集数'], ['shows', '看过剧数'], ['last_watch', '最近观看'], ['first_seen', '首次出现'], ['share_opens', '分享带来打开'], ['shares', '分享次数'], ['requests', '求片数']],
                 USER_COLS: [
@@ -1344,6 +1402,8 @@
                         sh: Object.assign(st0(), { channel: '', source: '', page: 1 }),
                         dw: Object.assign(st0(), { open: false, token: '', seed: null, sub: 'shows', exp: {}, banBusy: false }),
                         cf: { open: false, title: '', message: '', ok: '确定', danger: false },
+                        // 👤 自建账号(与 ACCESS_PASSWORD 老式密码并存)
+                        ac: Object.assign(st0(), { enabled: false, list: [], legacy: 0, form: { username: '', password: '', note: '' }, busy: {}, msg: '', msgOk: false }),
                         toasts: []
                     };
                 },
@@ -1619,9 +1679,11 @@
                         else if (id === 'users' && !this.us.data && !this.us.loading) this.loadUsers();
                         else if (id === 'requests' && !this.rq.data && !this.rq.loading) this.loadRequests();
                         else if (id === 'shares' && !this.sh.data && !this.sh.loading) this.loadShares();
+                        else if (id === 'accounts' && !this.ac.data && !this.ac.loading) this.loadAccounts();
                     },
                     refresh() {
                         if (this.tab === 'overview') this.loadOverview();
+                        else if (this.tab === 'accounts') this.loadAccounts();
                         else { this.ov.stale = true; ({ users: this.loadUsers, requests: this.loadRequests, shares: this.loadShares })[this.tab].call(this); }
                     },
                     goKpi(go) {
@@ -1830,6 +1892,66 @@
                     },
 
                     // ---------- 通用：确认框 / toast / 复制 / 键盘 ----------
+                    // ---------- 👤 自建账号 ----------
+                    loadAccounts() {
+                        return runLoad('ac', this.ac, signal => api('/api/admin/app-users', { signal })).then(d => {
+                            if (d) { this.ac.enabled = !!d.enabled; this.ac.list = Array.isArray(d.list) ? d.list : []; this.ac.legacy = +d.legacy || 0; }
+                        });
+                    },
+                    acNewOk() {
+                        const f = this.ac.form;
+                        return !!f.username.trim() && String(f.password).length >= 6;
+                    },
+                    async acCreate() {
+                        if (!this.acNewOk()) { this.ac.msgOk = false; this.ac.msg = '用户名必填，密码至少 6 位'; return; }
+                        this.ac.busy.__new = true; this.ac.msg = '';
+                        try {
+                            const d = await api('/api/admin/app-users', { method: 'POST', body: this.ac.form });
+                            this.ac.msgOk = true;
+                            this.ac.msg = '已创建账号「' + d.username + '」—— 把用户名和密码发给本人即可（本页不再显示明文密码，忘记了用「重置密码」）。';
+                            this.ac.form = { username: '', password: '', note: '' };
+                            this.ov.stale = true;
+                            await this.loadAccounts();
+                        } catch (e) {
+                            if (e.code !== 'auth') { this.ac.msgOk = false; this.ac.msg = '创建失败：' + e.message; }
+                        } finally { delete this.ac.busy.__new; }
+                    },
+                    async acReset(u) {
+                        const p = window.prompt('给「' + u.username + '」设新密码（6-128 位）：', '');
+                        if (p === null) return;
+                        if (String(p).length < 6) { this.toast('密码至少 6 位', 'err'); return; }
+                        this.ac.busy[u.username] = true;
+                        try {
+                            await api('/api/admin/app-users/password', { method: 'POST', body: { username: u.username, password: String(p) } });
+                            this.toast('已重置「' + u.username + '」的密码（其设备不掉线）', 'ok');
+                        } catch (e) { if (e.code !== 'auth') this.toast('重置失败：' + e.message, 'err'); }
+                        finally { delete this.ac.busy[u.username]; }
+                    },
+                    async acBan(u) {
+                        this.ac.busy[u.username] = true;
+                        try {
+                            await api('/api/admin/app-users/ban', { method: 'POST', body: { username: u.username, banned: !u.banned } });
+                            this.toast((u.banned ? '已解封 ' : '已封禁 ') + u.username, 'ok');
+                            this.ov.stale = true;
+                            await this.loadAccounts();
+                        } catch (e) { if (e.code !== 'auth') this.toast('操作失败：' + e.message, 'err'); }
+                        finally { delete this.ac.busy[u.username]; }
+                    },
+                    async acRemove(u) {
+                        const ok = await this.ask({
+                            title: '删除账号', danger: true, ok: '删除',
+                            message: '删除账号「' + u.username + '」？\n他所有设备会立刻掉线，且无法再登录（观看历史留在库里，但认不回本人）。\n只是想改密码的话用「重置密码」。'
+                        });
+                        if (!ok) return;
+                        this.ac.busy[u.username] = true;
+                        try {
+                            await api('/api/admin/app-users/remove', { method: 'POST', body: { username: u.username } });
+                            this.toast('已删除账号「' + u.username + '」', 'ok');
+                            this.ov.stale = true;
+                            await this.loadAccounts();
+                        } catch (e) { if (e.code !== 'auth') this.toast('删除失败：' + e.message, 'err'); }
+                        finally { delete this.ac.busy[u.username]; }
+                    },
                     ask(o) {
                         if (cfResolve) cfResolve(false);
                         Object.assign(this.cf, { open: true, title: o.title || '确认', message: o.message || '', ok: o.ok || '确定', danger: !!o.danger });

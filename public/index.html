@@ -4793,6 +4793,13 @@
             </div>
 
             <form id="password-form" onsubmit="return handlePasswordSubmit(event);">
+                <!-- 👤 自建账号：用户名可留空。留空 = 老式的「只输访问密码」；填了就按「用户名+密码」校验。
+                     服务端 /api/auth/check 返回 accounts:true 时才显示这一行（没建过账号的站完全看不到）。 -->
+                <div class="password-input-group" id="username-group" style="display: none;">
+                    <input type="text" id="username-input" class="password-input" style="padding-right: 20px;"
+                        placeholder="用户名（可留空）" autocomplete="username" spellcheck="false">
+                </div>
+
                 <div class="password-input-group">
                     <input type="password" id="password-input" class="password-input" placeholder="请输入访问密码"
                         autocomplete="current-password" required>
@@ -5626,6 +5633,16 @@
                         </label>
                     </div>
 
+                    <!-- 🔑 修改密码(仅自建账号登录时显示:老式访问密码是环境变量里写死的,改不了) -->
+                    <button type="button" class="set-row is-link" v-if="myAccount"
+                        @click="showSettingsModal = false; openChangePassword()">
+                        <span>
+                            <span class="set-title"><i class="fas fa-key" aria-hidden="true"></i>修改密码</span>
+                            <span class="set-desc">当前账号：{{ myAccount }}；改完其他设备保持登录</span>
+                        </span>
+                        <i class="fas fa-chevron-right" style="color: #666;" aria-hidden="true"></i>
+                    </button>
+
                     <!-- 🚪 退出登录(以前只在页脚) -->
                     <button type="button" class="set-row is-link"
                         @click="showSettingsModal = false; confirmLogout()">
@@ -5639,6 +5656,34 @@
                     <!-- 提示信息 -->
                     <div class="set-tip">
                         <i class="fas fa-info-circle" aria-hidden="true"></i>设置会自动保存，刷新页面后生效完整的过滤效果
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🔑 修改密码(自建账号;老式访问密码登录时没有入口) -->
+        <div class="info-modal-overlay" v-if="showChangePwd" @click.self="showChangePwd = false">
+            <div class="info-modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="cp-title" style="max-width: 440px;">
+                <button class="info-modal-close" @click="showChangePwd = false" aria-label="关闭"><i class="fas fa-times"></i></button>
+                <div class="settings-head"><h3 class="settings-h" id="cp-title"><i class="fas fa-key"></i>修改密码</h3></div>
+                <div class="settings-body">
+                    <div class="set-block">
+                        <label class="set-title" for="cp-old">当前密码</label>
+                        <input id="cp-old" type="password" class="password-input" style="padding-right:20px; margin-top:8px;"
+                            v-model="cpOld" autocomplete="current-password" @keyup.enter="submitChangePassword">
+                    </div>
+                    <div class="set-block">
+                        <label class="set-title" for="cp-new">新密码（6-128 位）</label>
+                        <input id="cp-new" type="password" class="password-input" style="padding-right:20px; margin-top:8px;"
+                            v-model="cpNew" autocomplete="new-password" @keyup.enter="submitChangePassword">
+                    </div>
+                    <div v-if="cpMsg" style="font-size:13px; margin-top:10px;" :style="{ color: cpOk ? '#4ade80' : '#ff6b6b' }">{{ cpMsg }}</div>
+                    <button type="button" class="btn btn-outline-light" style="width:100%; margin-top:16px;"
+                        :disabled="cpBusy" @click="submitChangePassword">
+                        <i class="fas" :class="cpBusy ? 'fa-spinner fa-spin' : 'fa-check'" aria-hidden="true"></i> {{ cpBusy ? '提交中…' : '确认修改' }}
+                    </button>
+                    <div class="set-tip" style="color:#bbb; background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">
+                        <i class="fas fa-info-circle" aria-hidden="true"></i>改密码不会把你其他设备踢下线：登录令牌与密码是分开的，只有站长删号才会立刻掉线。
                     </div>
                 </div>
             </div>
@@ -6204,6 +6249,8 @@
         const AUTH_EXPIRY_KEY = 'emax_auth_expiry';
         let SHARE_TRIAL_SEC = 0;   // 🎟️ 分享链接没登录可试看的秒数(/api/auth/check 的 shareTrial;0 = 不试看)
         let QR_LOGIN = false;      // 📱 本站开了扫码登录(/api/auth/check 的 qrLogin:server.js 部署 + 配了访问密码;Vercel 没有)
+        let ACCOUNTS_ENABLED = false;   // 👤 自建账号(/api/auth/check 的 accounts:需 CACHE_TYPE=sqlite;站长在后台建号后才显示用户名框)
+        let MY_ACCOUNT = '';       // 本次登录用的账号名(空 = 老式访问密码登录,没有"修改密码"入口)
 
         // 🔗 分享落地:链接带 ?s=<分享码> → 趁地址栏还没被改写(syncShareUrl / closeDetail 会去掉它)先存进 sessionStorage。
         //    没登录的访客要先过登录墙,登录后 startApp → initApp 才报 /api/stats/share-open(记"这次分享带来了登录")再删。
@@ -6437,6 +6484,9 @@
             const submitBtn = document.getElementById('password-submit-btn');
             const remember = document.getElementById('remember-password').checked;
             const errorDiv = document.getElementById('password-error');
+            // 👤 自建账号：填了用户名才带上，留空就是老式的「只输密码」，两种方式服务端都认
+            const nameEl = document.getElementById('username-input');
+            const username = (nameEl && nameEl.value) ? nameEl.value.trim() : '';
 
             errorDiv.style.display = 'none';
             submitBtn.disabled = true;
@@ -6446,12 +6496,15 @@
                 const res = await fetch('/api/auth/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: input.value })
+                    body: JSON.stringify(username ? { username, password: input.value } : { password: input.value })
                 });
 
                 const data = await res.json();
 
                 if (data.success) {
+                    // 👤 记住是不是用账号登录的(账号用户才有"修改密码"入口);老式密码登录 data.username 为空
+                    MY_ACCOUNT = data.username || '';
+                    try { if (MY_ACCOUNT) localStorage.setItem('donggua_account_name', MY_ACCOUNT); else localStorage.removeItem('donggua_account_name'); } catch (e) { }
                     localStorage.setItem(AUTH_STORAGE_KEY, data.passwordHash);
 
                     if (remember) {
@@ -6469,7 +6522,7 @@
 
                     hideLoginScreen();
                 } else {
-                    showPasswordError('密码错误，请重试');
+                    showPasswordError(data.banned ? '该账号已被封禁，请联系站长' : (username ? '用户名或密码错误，请重试' : '密码错误，请重试'));
                     input.value = '';
                     input.focus();
                 }
@@ -6494,6 +6547,9 @@
                 try { localStorage.setItem('donggua_auth_required', data.requirePassword ? '1' : '0'); } catch (e) { }
                 SHARE_TRIAL_SEC = Math.max(0, Number(data.shareTrial) || 0);
                 QR_LOGIN = data.qrLogin === true;
+                ACCOUNTS_ENABLED = data.accounts === true;
+                // 上次是不是用账号登录的(刷新后"修改密码"入口还在);真正校验在服务端按 token 做,这里只是显示用
+                try { MY_ACCOUNT = localStorage.getItem('donggua_account_name') || ''; } catch (e) { }
 
                 if (!data.requirePassword) {
                     window.startApp && window.startApp();
@@ -6568,6 +6624,8 @@
                 localStorage.removeItem('donggua_popular_cache3');
                 localStorage.removeItem('donggua_popular_cache2');
                 localStorage.removeItem('donggua_fav_tmdb');   // 📅 追更日历的片名 → TMDB 表(键就是收藏的片名)
+                localStorage.removeItem('donggua_account_name');   // 👤 账号名(退出后设置里不该再显示"修改密码")
+                MY_ACCOUNT = '';
             } catch (e) { }
             return (async () => {
                 try {
@@ -6627,6 +6685,10 @@
 
             screen.classList.remove('hidden');
             screen.style.display = 'flex';
+
+            // 👤 建过账号的站才显示"用户名"输入框;老式单/多密码站完全看不到,体验不变
+            const ug = document.getElementById('username-group');
+            if (ug) ug.style.display = ACCOUNTS_ENABLED ? 'block' : 'none';
 
             switchLoginMode(loginDefaultMode());
         }
@@ -9915,6 +9977,10 @@
                     popularList: [],
                     popularCanScrollLeft: false,
                     popularCanScrollRight: true,
+                    // 🔑 修改密码(自建账号)
+                    myAccount: '',                  // 当前账号名(空 = 老式访问密码登录,不显示改密入口)
+                    showChangePwd: false,
+                    cpOld: '', cpNew: '', cpMsg: '', cpOk: false, cpBusy: false,
                     // 🔔 Web Push 更新提醒
                     pushEnabled: false,             // 来自 /api/config(push_enabled)
                     pushSubscribed: false,          // 本浏览器当前是否已订阅(打开偏好设置时按 pushManager 实况刷新)
@@ -10552,11 +10618,38 @@
                 searched(v) { if (!v) this._favRefreshMaybe(); },
                 // 🔔 打开偏好设置时按浏览器实况刷新推送开关(用户可能在系统设置里关了通知权限)
                 showSettingsModal(v) {
+                    // 👤 每次打开设置时读一次"当前是不是账号登录"(MY_ACCOUNT 是普通变量,不是响应式的)
+                    if (v) { try { this.myAccount = (typeof MY_ACCOUNT === 'string') ? MY_ACCOUNT : ''; } catch (e) { this.myAccount = ''; } }
                     if (v) this._pushRefreshState();
                     else if (this._homePushT) this._pushHomeLayout();   // 🧩 关弹窗时还没推的首页板块改动立刻推
                 }
             },
             methods: {
+                // ========== 🔑 修改密码(自建账号) ==========
+                openChangePassword() {
+                    this.cpOld = ''; this.cpNew = ''; this.cpMsg = ''; this.cpOk = false; this.cpBusy = false;
+                    this.showChangePwd = true;
+                },
+                async submitChangePassword() {
+                    if (this.cpBusy) return;
+                    if (!this.cpOld || String(this.cpNew).length < 6) { this.cpOk = false; this.cpMsg = '请填写当前密码，且新密码至少 6 位'; return; }
+                    this.cpBusy = true; this.cpMsg = '';
+                    try {
+                        const token = localStorage.getItem(AUTH_STORAGE_KEY) || '';
+                        const res = await fetch('/api/auth/change-password', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ token, oldPassword: this.cpOld, newPassword: this.cpNew })
+                        });
+                        const d = await res.json().catch(() => ({}));
+                        this.cpOk = !!d.ok;
+                        this.cpMsg = d.ok ? '密码已修改，其他设备保持登录' : (d.error || '修改失败，请重试');
+                        if (d.ok) {
+                            this.cpOld = ''; this.cpNew = '';
+                            setTimeout(() => { this.showChangePwd = false; }, 1200);
+                        }
+                    } catch (e) { this.cpOk = false; this.cpMsg = '网络错误，请重试'; }
+                    this.cpBusy = false;
+                },
                 // ========== 📺 直播(IPTV) ==========
                 // 拉取精选直播频道(本地缓存 2h 秒显，再后台刷新；失败沿用旧缓存)
                 async fetchLiveChannels() {
