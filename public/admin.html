@@ -869,9 +869,9 @@
                                 </div>
 
                                 <div class="panel" style="margin-top:16px">
-                                    <div class="panel-h"><h2>新建账号</h2><span class="muted">用户名 3-32 位（字母/数字/下划线/连字符），密码 6-128 位</span></div>
+                                    <div class="panel-h"><h2>新建账号</h2><span class="muted">用户名 2-32 位（中文/字母/数字，可含 _ - .），密码 6-128 位</span></div>
                                     <div class="req-form">
-                                        <input class="req-input" v-model="ac.form.username" placeholder="用户名（如 zhangsan）" maxlength="32" autocomplete="off">
+                                        <input class="req-input" v-model="ac.form.username" placeholder="用户名（如 张三 / zhangsan）" maxlength="32" autocomplete="off">
                                         <input class="req-input" v-model="ac.form.password" type="password" placeholder="初始密码（至少 6 位）" maxlength="128" autocomplete="new-password">
                                         <input class="req-input" v-model="ac.form.note" placeholder="备注（可选，如「张三 · 电视」）" maxlength="200">
                                         <button class="btn btn-danger" :disabled="ac.busy.__new || !acNewOk()" @click="acCreate">{{ ac.busy.__new ? '创建中…' : '创建账号' }}</button>
