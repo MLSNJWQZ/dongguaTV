@@ -324,6 +324,51 @@
       "name": "乐子资源",
       "api": "https://cj.lziapi.com/api.php/provide/vod",
       "key": "s9"
+    },
+    {
+      "name": "芒果资源",
+      "api": "https://caiji.mgzyapi.com/api.php/provide/vod",
+      "key": "s66"
+    },
+    {
+      "name": "西瓜资源",
+      "api": "https://caiji.xgzyapi.com/api.php/provide/vod",
+      "key": "s67"
+    },
+    {
+      "name": "360资源ZZ",
+      "api": "https://360zyzz.com/api.php/provide/vod",
+      "key": "s68"
+    },
+    {
+      "name": "百度资源",
+      "api": "https://api.apibdzy.com/api.php/provide/vod",
+      "key": "s69"
+    },
+    {
+      "name": "优质YZ",
+      "api": "https://api.yzzy-api.com/inc/apijson.php",
+      "key": "s70"
+    },
+    {
+      "name": "OK资源",
+      "api": "https://api.okzyw.net/api.php/provide/vod",
+      "key": "s71"
+    },
+    {
+      "name": "艾旦影视",
+      "api": "https://lovedan.net/api.php/provide/vod",
+      "key": "s72"
+    },
+    {
+      "name": "量子资源2",
+      "api": "https://cj.lzcaiji.com/api.php/provide/vod",
+      "key": "s73"
+    },
+    {
+      "name": "魔都资源2",
+      "api": "https://www.moduzy.com/api.php/provide/vod",
+      "key": "s74"
     }
   ]
 }
