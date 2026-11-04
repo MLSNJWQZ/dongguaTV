@@ -1,7 +1,7 @@
 name: 上游更新提醒
 
 # 每天检查上游 EdNovas/dongguaTV 有没有新提交。
-# 有更新 → 开一个 Issue 提醒（已存在则原地更新内容，不会重复刷屏）
+# 有更新 → 开/更新 Issue 提醒（已存在则原地更新内容，不会重复刷屏）
 # 没更新 → 自动关掉这个 Issue
 # 注意：只提醒，不自动 merge（本 fork 定制较多，自动合并容易冲突）
 
@@ -36,6 +36,20 @@ jobs:
           echo "AHEAD=$AHEAD" >> "$GITHUB_ENV"
           git log --pretty=format:'- %h %s' HEAD..upstream/main | head -15 > upstream_commits.txt || true
 
+      # 查找已有的提醒 Issue。
+      # 注意：不要用 `gh issue list --search '中文 in:title'`——GitHub 搜索对中文标题
+      # 在 runner 上会返回空，导致去重与自动关闭双双失效（历史 Issue 就是这么堆起来的）。
+      # 改为拉取全部 open issue 后用 jq 本地过滤标题，100% 可靠。
+      - name: 查找已有提醒 Issue
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM=$(gh issue list --state open --limit 100 --json number,title \
+            --jq '[.[] | select(.title | startswith("⬆️ 上游 dongguaTV"))] | .[0].number // empty')
+          echo "找到已有提醒 Issue: ${NUM:-无}"
+          echo "num=$NUM" >> "$GITHUB_OUTPUT"
+
       - name: 有更新 → 开/更新 Issue
         if: env.BEHIND != '0'
         env:
@@ -55,18 +69,15 @@ jobs:
             echo ""
             echo "_本 Issue 由每天 09:00 的「上游更新提醒」自动维护，合并完会自动关闭。_"
           } > issue_body.md
-          NUM=$(gh issue list --state open --search '上游 dongguaTV in:title' --limit 1 --json number --jq '.[0].number // empty')
+          NUM="${{ steps.find.outputs.num }}"
           if [ -n "$NUM" ]; then
-            echo "已有提醒 Issue #$NUM，更新内容"
+            echo "更新已有提醒 Issue #$NUM"
             gh issue edit "$NUM" --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --body-file issue_body.md
           else
-            HTTP=$(curl -s -o resp.json -w "%{http_code}" -X POST \
-              -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${{ github.repository }}/issues" \
-              -d "$(jq -n --arg t "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --rawfile b issue_body.md '{title:$t, body:$b}')")
-            echo "create issue http=$HTTP"
-            cat resp.json
-            [ "$HTTP" = "201" ]
+            echo "没有已有提醒，新建一个"
+            gh issue create \
+              --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
+              --body-file issue_body.md
           fi
 
       - name: 无更新 → 关掉已有提醒
@@ -74,7 +85,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NUM=$(gh issue list --state open --search '上游 dongguaTV in:title' --json number --jq '.[0].number // empty')
+          NUM="${{ steps.find.outputs.num }}"
           if [ -n "$NUM" ]; then
             echo "已与上游一致，关闭 Issue #$NUM"
             gh issue close "$NUM" --comment "上游的提交已全部合并，本提醒自动关闭。"
