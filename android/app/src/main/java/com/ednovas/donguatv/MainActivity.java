@@ -2,6 +2,7 @@ package com.ednovas.donguatv;
 
 import android.app.UiModeManager;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.os.Build;
@@ -78,9 +79,13 @@ public class MainActivity extends BridgeActivity {
             statusBarHeight = getStatusBarHeight();
         }
 
-        // 📺 检测是否运行在电视/盒子上（Leanback）
+        // 📺 检测是否运行在电视/盒子上。
+        // 只靠 UI_MODE_TYPE_TELEVISION 会漏判：不少国产盒子/投影只上报 FEATURE_LEANBACK
+        // （官方推荐的判定方式），漏判会导致方向键拦截、文字放大、沉浸全屏全部失效。
         UiModeManager umm = (UiModeManager) getSystemService(UI_MODE_SERVICE);
-        isTv = umm != null && umm.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
+        isTv = (umm != null && umm.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION)
+            || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+            || getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEVISION);
 
         // 预读 TV 导航运行时脚本（assets/tv_nav.js）
         tvRuntimeJs = readAsset("tv_nav.js");
@@ -324,8 +329,10 @@ public class MainActivity extends BridgeActivity {
         webView.evaluateJavascript(probe, result -> {
             if (result != null && result.contains("__dg_no_runtime__") && repeatCount == 0) {
                 if (tvRuntimeJs != null) {
-                    webView.evaluateJavascript(tvRuntimeJs, null);
-                    uiHandler.postDelayed(() -> webView.evaluateJavascript(probe, null), 250);
+                    // evaluateJavascript 的回调在脚本执行完毕后才触发，直接在回调里补发按键即可。
+                    // 旧写法再延迟 250ms 会让「页面刷新后的第一次按键」看起来没反应。
+                    webView.evaluateJavascript(tvRuntimeJs, injected ->
+                        webView.evaluateJavascript(probe, null));
                 }
                 // 脚本读取失败时静默放弃，不重复骚扰
             }

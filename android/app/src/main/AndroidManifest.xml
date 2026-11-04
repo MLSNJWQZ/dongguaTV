@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 📺 Android TV 支持（让手机版也能在 TV 上运行） -->
+    <!-- 📺 Android TV 上架三要件（本清单已全部齐备，勿再重复添加）：
+         1) android.software.leanback（required=false = 手机与 TV 共用一个包）
+         2) activity 里的 CATEGORY_LEANBACK_LAUNCHER intent-filter
+         3) android.hardware.touchscreen required=false
+         注意：官方已废弃 android.hardware.type.television（早期写作 type.tv），
+         其作用由 leanback 取代；设 required=true 反而会让手机装不上。 -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.faketouch" android:required="false" />
@@ -31,10 +36,11 @@
     <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
     <uses-feature android:name="android.hardware.screen.landscape" android:required="false" />
 
+    <!-- TV 主屏横幅必须是 320x180 专用图；原先指向方形 launcher 图标，会被裁切变形 -->
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:banner="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
