@@ -4,6 +4,11 @@ name: 上游更新提醒
 # 有更新 → 开/更新 Issue 提醒（已存在则原地更新内容，不会重复刷屏）
 # 没更新 → 自动关掉这个 Issue
 # 注意：只提醒，不自动 merge（本 fork 定制较多，自动合并容易冲突）
+#
+# 重要：本文件全部使用 curl + REST API，**不要**改用 gh CLI。
+# 原因：gh issue list/create/edit/close 走 GraphQL，GITHUB_TOKEN 在 fork 仓库上
+# 会返回 "Resource not accessible by integration"，且 gh issue list --json 会
+# 静默返回空数组，导致去重与自动关闭双双失效（历史上 Issue 就是这么堆到 9 个的）。
 
 on:
   schedule:
@@ -36,17 +41,17 @@ jobs:
           echo "AHEAD=$AHEAD" >> "$GITHUB_ENV"
           git log --pretty=format:'- %h %s' HEAD..upstream/main | head -15 > upstream_commits.txt || true
 
-      # 查找已有的提醒 Issue。
-      # 注意：不要用 `gh issue list --search '中文 in:title'`——GitHub 搜索对中文标题
-      # 在 runner 上会返回空，导致去重与自动关闭双双失效（历史 Issue 就是这么堆起来的）。
-      # 改为拉取全部 open issue 后用 jq 本地过滤标题，100% 可靠。
+      # 用 REST 列出全部 open issue，再本地 jq 过滤标题（不用 gh、不用搜索 API）
       - name: 查找已有提醒 Issue
         id: find
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          NUM=$(gh issue list --state open --limit 100 --json number,title \
-            --jq '[.[] | select(.title | contains("上游 dongguaTV"))] | .[0].number // empty')
+          NUM=$(curl -sS -H "Authorization: token $GH_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/$REPO/issues?state=open&per_page=100" \
+               | jq -r '[.[] | select(.pull_request == null) | select(.title | contains("上游 dongguaTV"))] | .[0].number // empty')
           echo "找到已有提醒 Issue: ${NUM:-无}"
           echo "num=$NUM" >> "$GITHUB_OUTPUT"
 
@@ -54,7 +59,9 @@ jobs:
         if: env.BEHIND != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
+          TITLE="⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并"
           {
             echo "上游 [EdNovas/dongguaTV](https://github.com/EdNovas/dongguaTV) 有 **$BEHIND** 个新提交没合并（你的分支领先上游 $AHEAD 个提交）。"
             echo ""
@@ -69,26 +76,48 @@ jobs:
             echo ""
             echo "_本 Issue 由每天 09:00 的「上游更新提醒」自动维护，合并完会自动关闭。_"
           } > issue_body.md
+
           NUM="${{ steps.find.outputs.num }}"
+          PAYLOAD=$(jq -n --arg t "$TITLE" --rawfile b issue_body.md '{title:$t, body:$b}')
+
           if [ -n "$NUM" ]; then
             echo "更新已有提醒 Issue #$NUM"
-            gh issue edit "$NUM" --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" --body-file issue_body.md
+            HTTP=$(curl -sS -o resp.json -w "%{http_code}" -X PATCH \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/issues/$NUM" \
+              -d "$PAYLOAD")
+            echo "edit issue http=$HTTP"
+            cat resp.json
+            [ "$HTTP" = "200" ]
           else
             echo "没有已有提醒，新建一个"
-            gh issue create \
-              --title "⬆️ 上游 dongguaTV 有 $BEHIND 个新提交待合并" \
-              --body-file issue_body.md
+            HTTP=$(curl -sS -o resp.json -w "%{http_code}" -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/issues" \
+              -d "$PAYLOAD")
+            echo "create issue http=$HTTP"
+            cat resp.json
+            [ "$HTTP" = "201" ]
           fi
 
       - name: 无更新 → 关掉已有提醒
         if: env.BEHIND == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           NUM="${{ steps.find.outputs.num }}"
           if [ -n "$NUM" ]; then
             echo "已与上游一致，关闭 Issue #$NUM"
-            gh issue close "$NUM" --comment "上游的提交已全部合并，本提醒自动关闭。"
+            HTTP=$(curl -sS -o resp.json -w "%{http_code}" -X PATCH \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/issues/$NUM" \
+              -d '{"state":"closed","state_reason":"completed","body":"上游的提交已全部合并，本提醒自动关闭。"}')
+            echo "close issue http=$HTTP"
+            cat resp.json
           else
             echo "已与上游一致，无需提醒"
           fi
