@@ -46,7 +46,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NUM=$(gh issue list --state open --limit 100 --json number,title \
-            --jq '[.[] | select(.title | startswith("⬆️ 上游 dongguaTV"))] | .[0].number // empty')
+            --jq '[.[] | select(.title | contains("上游 dongguaTV"))] | .[0].number // empty')
           echo "找到已有提醒 Issue: ${NUM:-无}"
           echo "num=$NUM" >> "$GITHUB_OUTPUT"
 
